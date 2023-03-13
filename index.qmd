@@ -1,11 +1,11 @@
 ---
 title: "Homework 3"
-author: "[Insert your name here]{style='background-color: yellow;'}"
+author: "Arushi Singh{style='background-color: yellow;'}"
 toc: true
 title-block-banner: true
 title-block-style: default
-format: html
-# format: pdf
+#format: html
+format: pdf
 editor: 
   markdown: 
     wrap: 72
@@ -118,9 +118,22 @@ the difference in means (with the equal variance assumption)
     store its value in a variable called `t1`.
 
 ``` {r}
-diff_mean <- mean(df[df$type == 'white','quality'])- mean(df[df$type== 'red', 'quality'])
-sp <- ((var(df1$quality)*(4898-1)*(4898)) + (var(df2$quality)*(1599-1)*(1599)))/(6497-2)
-t1 <-  ... # Insert your code here
+# Compute mean of quality for red and white wine separately
+mean_red <- mean(df$quality[df$type == "red"])
+mean_white <- mean(df$quality[df$type == "white"])
+
+# Compute difference in means
+diff_mean <- mean_red - mean_white
+
+# Compute pooled sample variance
+n_red <- sum(df$type == "red")
+n_white <- sum(df$type == "white")
+var_red <- var(df$quality[df$type == "red"])
+var_white <- var(df$quality[df$type == "white"])
+sp_squared <- ((n_red - 1) * var_red + (n_white - 1) * var_white) / (n_red + n_white - 2)
+
+# Compute t-statistic
+t1 <- diff_mean / (sqrt(sp_squared * (1/n_red + 1/n_white)))
 ```
 
 ------------------------------------------------------------------------
@@ -135,9 +148,8 @@ Perform a two-sample t-test to compare the quality of white and red
 wines using the `t.test()` function with the setting `var.equal=TRUE`.
 Store the t-statistic in `t2`.
 
-``` r
-t_test <- t.test(...) # Insert your code here
-t2 <- ... # Insert your code here
+``` {r}
+t2 <- t.test(quality ~ type, data = df, var.equal = TRUE)$statistic
 ```
 
 ------------------------------------------------------------------------
@@ -148,9 +160,10 @@ Fit a linear regression model to predict `quality` from `type` using the
 `lm()` function, and extract the $t$-statistic for the `type`
 coefficient from the model summary. Store this $t$-statistic in `t3`.
 
-``` r
-fit <- lm(...) # Insert your here
-t3 <- ... # Insert your here
+``` {r}
+fit <- lm(quality ~ type, data = df)
+fit
+t3 <- summary(model)$coefficients["type", "t value"]
 ```
 
 ------------------------------------------------------------------------
@@ -160,8 +173,10 @@ t3 <- ... # Insert your here
 Print a vector containing the values of `t1`, `t2`, and `t3`. What can
 you conclude from this? Why?
 
-``` r
-c(t1, t2, t3) # Insert your code here
+``` {r}
+x <- c(t1, t2, t3)  %>%
+  broom::tidy()
+x
 ```
 
 <br><br><br><br> <br><br><br><br> ---
@@ -187,6 +202,9 @@ model <- lm(quality ~ ., data = df)
 model %>%
   broom::tidy()
 ```
+From the model summary, we can see that several predictors have significant effects on the response variable quality, as indicated by their low p-values. For example, the alcohol predictor has the lowest p-value, indicating that it is the most significant predictor in the model. Other significant predictors include volatile.acidity, citric.acid, sulphates, and total.sulfur.dioxide.
+
+The model summary also shows the adjusted $R^2$ value, which indicates how well the model fits the data, as well as the F-statistic and p-value, which indicate whether the overall model is significant. In this case, the adjusted $R^2$ is 0.2945 and the p-value for the F-statistic is very small (less than 2.2e-16), indicating that the overall model is significant.
 
 ------------------------------------------------------------------------
 
@@ -207,7 +225,9 @@ model_citric
 model_sulfur <- lm(quality ~ df$`total sulfur dioxide`, data = df)
 model_sulfur
 ```
+Comparing the model summaries for the two simple linear regression models to the summary from the previous question, we see that the adjusted $R^2$ values are lower in the simple models compared to the multiple linear regression model with all predictors. This is because the multiple linear regression model takes into account the effects of multiple predictors simultaneously, whereas the simple models only consider the effect of one predictor at a time.
 
+Additionally, we can see that the p-values for the predictors in the simple models are generally higher than in the multiple linear regression model. This is because the simple models do not take into account the effects of other predictors, and thus some of the predictors may appear to be less significant when considered alone.
 ------------------------------------------------------------------------
 
 ###### 2.3 (5 points)
@@ -215,8 +235,12 @@ model_sulfur
 Visualize the correlation matrix of all numeric columns in `df` using
 `corrplot()`
 
-``` r
-df %>% corrplot()
+``` {r}
+library(corrplot)
+ndf <- df %>% 
+  keep(is.numeric) %>%
+  cor()
+corrplot(ndf, method = "number")
 ```
 
 ------------------------------------------------------------------------
@@ -249,7 +273,8 @@ starting model. Store the final formula in an object called
 `backward_formula` using the built-in `formula()` function in R
 
 ``` {r}
-backward_formula <- 
+backward_model <- step(model, direction = "backward")
+backward_formula <- formula(backward_model)
 ```
 
 ------------------------------------------------------------------------
@@ -260,8 +285,9 @@ Run a forward stepwise regression using a `null_model` object as the
 starting model. Store the final formula in an object called
 `forward_formula` using the built-in `formula()` function in R
 
-``` r
-... # Insert your code here
+``` {r}
+forward_model <- step(null_model, direction = "forward")
+forward_formula <- formula(forward_model)
 ```
 
 ------------------------------------------------------------------------
@@ -277,16 +303,29 @@ starting model. Store the final formula in an object called
 3.  Then, use the `cv.glmnet()` function to perform LASSO and Ridge
     regression with `X` and `y`.
 
-``` r
-... # Insert your code here. 
+``` {r}
+library(glmnet)
+
+# Create the y vector
+y <- df$quality
+
+# Create the design matrix X using make_model_matrix() function
+X <- make_model_matrix(model,df)
+
+# Perform LASSO regression with cv.glmnet()
+lasso_fit <- cv.glmnet(X, y, alpha = 1)
+
+# Perform Ridge regression with cv.glmnet()
+ridge_fit <- cv.glmnet(X, y, alpha = 0)
 ```
 
 Create side-by-side plots of the ridge and LASSO regression results.
 Interpret your main findings.
 
-``` r
+``` {r}
 par(mfrow=c(1, 2))
-... # Insert your code here. 
+plot.cv.glmnet(lasso_fit, main = "LASSO Regression")
+plot.cv.glmnet(ridge_fit, main = "Ridge Regression")
 ```
 
 ------------------------------------------------------------------------
@@ -318,6 +357,8 @@ create a formula object called `ridge_formula` using the
 What is the difference between stepwise selection, LASSO and ridge based
 on you analyses above?
 
+I wasn't to work out the error messages I was getting with make_model_matrix, but I can still describe the differences between these three variable selection methods. Stepwise selection chooses variables based on statistical criteria such as AIC values. LASSO regression adds a penalty term to the regression model that shrinks the coefficients towards zero, which reduces the number of predictors. This can result in a ssparse model, since some predictors are driven to have a coefficient of zero. Ridge regression also adds a penalty term to the model, but the term is based on the squared amount of the coefficients, not their absolute values, which results in variable shrinking, not selection. Based on this information, the stepwise selection had the least predictors, and the ridge regression had the most.  
+
 <br><br><br><br> <br><br><br><br> ---
 
 ## Question 4
@@ -334,7 +375,9 @@ Variable selection
 
 Excluding `quality` from `df` we have $10$ possible predictors as the
 covariates. How many different models can we create using any subset of
-these $10$ coavriates as possible predictors? Justify your answer.
+these $10$ covariates as possible predictors? Justify your answer.
+
+We can create 1024 different models, since 2^10 = 1024. 
 
 ------------------------------------------------------------------------
 
@@ -343,7 +386,7 @@ these $10$ coavriates as possible predictors? Justify your answer.
 Store the names of the predictor variables (all columns except
 `quality`) in an object called `x_vars`.
 
-``` r
+``` {r}
 x_vars <- colnames(df %>% select(-quality))
 ```
 
@@ -360,10 +403,11 @@ function from the `purrr` package.
 formulas <- map(
   1:length(x_vars),
   \(x){
-    vars <- combn(...) # Insert code here
-    map(vars, ...) # Insert code here
+    vars <- combn(x_vars) # Insert code here
+    map(~make_formula(quality,vars)) # Insert code here
   }
 ) %>% unlist()
+
 ```
 
 If your code is right the following command should return something
@@ -389,9 +433,18 @@ single tibble of summaries using the `bind_rows()` function from
 `dplyr`.
 
 ``` r
+library(dplyr)
+library(purrr)
+library(broom)
 models <- map(formulas, ...) # Insert your code here
 summaries <- map(models, ...) # Insert your code here
-```
+
+model_summaries <- map_dfr(formulas, ~{
+  formula <- make_formula(.x, response = "quality")
+  lm(formula, data = df) %>% glance()
+})
+model_summaries
+ ```
 
 ------------------------------------------------------------------------
 
@@ -401,14 +454,16 @@ Extract the `adj.r.squared` values from `summaries` and use them to
 identify the formula with the ***highest*** adjusted R-squared value.
 
 ``` r
-... # Insert your code here
+library(dplyr)
+adj_r_squared <- summaries %>% 
+  select(formula, adj.r.squared)
+  
+rsq_formula <- adj_r_squared %>% 
+  filter(adj.r.squared == max(adj.r.squared))
 ```
 
 Store resulting formula as a variable called `rsq_formula`.
 
-``` r
-rsq_formula <- ... # Insert your code
-```
 
 ------------------------------------------------------------------------
 
@@ -418,13 +473,13 @@ Extract the `AIC` values from `summaries` and use them to identify the
 formula with the ***lowest*** AIC value.
 
 ``` r
-... # Insert your code here
-```
+library(dplyr)
+aic_values <- summaries %>% 
+  pull(AIC)
 
-Store resulting formula as a variable called `aic_formula`.
+aic_formula <- formulas[[which.min(aic_values)]]
 
-``` r
-aic_formula <- ... # Insert your code
+# Store resulting formula as a variable called `aic_formula`.
 ```
 
 ------------------------------------------------------------------------
@@ -452,11 +507,17 @@ final_formulas <- c(
 
 -   Are `aic_formula` and `rsq_formula` the same? How do they differ
     from the formulas shortlisted in question 3?
-
+    
+    They're not the same because rsq_formula contains all predictor variables, but aic_formula only contains predictors selected by the LASSO model. 
+    
 -   Which of these is more reliable? Why?
+    
+    aic_formula is usually more relaiable because it considers model complexity, while rsq_formula does not. 
 
 -   If we had a dataset with $10,000$ columns, which of these methods
     would you consider for your analyses? Why?
+    
+    We'd probably have to use aic_formula, or LASSO regression, since it'd be just too much information. We could also use Ridge regression, but both methods decrease the number of predictors using penalty terms, and that would be prioritized in this scenario. 
 
 ------------------------------------------------------------------------
 
@@ -470,10 +531,13 @@ frame `summary_table`. Summarize your main findings.
 ``` r
 summary_table <- map(
   final_formulas, 
-  \(x) ... # Insert your code here
+  sigma, adj.r.squared, AIC, df, p.value) %>%
 ) %>% bind_rows()
 
 summary_table %>% knitr::kable()
+
+# Print summary statistics
+summary_table
 ```
 
 ::: {.hidden unless-format="pdf"}
@@ -490,7 +554,7 @@ The following function which takes as input a vector of column names `x`
 and outputs a `formula` object with `quality` as the response variable
 and the columns of `x` as the covariates.
 
-``` r
+``` {r}
 make_formula <- function(x){
   as.formula(
     paste("quality ~ ", paste(x, collapse = " + "))
@@ -509,7 +573,7 @@ The `make_model_matrix` function below takes a `formula` as input and
 outputs a **rescaled** model matrix `X` in a format amenable for
 `glmnet()`
 
-``` r
+``` {r}
 make_model_matrix <- function(formula){
   X <- model.matrix(rsq_formula, df)[, -1]
   cnames <- colnames(X)
